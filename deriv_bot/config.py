@@ -21,6 +21,11 @@ class BotConfig:
     lookback: int = field(default_factory=lambda: int(os.getenv("DERIV_LOOKBACK", "20")))
     threshold: float = field(default_factory=lambda: float(os.getenv("DERIV_THRESHOLD", "0.8")))
     trade_pause_seconds: int = field(default_factory=lambda: int(os.getenv("DERIV_TRADE_PAUSE_SECONDS", "30")))
+    max_trade_amount: float = field(default_factory=lambda: float(os.getenv("DERIV_MAX_TRADE_AMOUNT", "1")))
+    max_daily_loss: float = field(default_factory=lambda: float(os.getenv("DERIV_MAX_DAILY_LOSS", "50")))
+    max_trades_per_day: int = field(default_factory=lambda: int(os.getenv("DERIV_MAX_TRADES_PER_DAY", "10")))
+    cooldown_seconds: int = field(default_factory=lambda: int(os.getenv("DERIV_COOLDOWN_SECONDS", "30")))
+    trade_log_path: str = field(default_factory=lambda: os.getenv("DERIV_TRADE_LOG_PATH", "trades.csv"))
 
 
 def load_config() -> BotConfig:

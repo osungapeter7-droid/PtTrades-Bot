@@ -1,6 +1,10 @@
 import asyncio
+import time
 from collections import deque
-from typing import Deque, List, Optional
+from datetime import datetime
+from typing import Deque, List, Optional, Tuple
+
+from deriv_bot.logger import TradeLogger
 
 
 class MomentumStrategy:
@@ -8,24 +12,25 @@ class MomentumStrategy:
         self.lookback = lookback
         self.threshold = threshold
 
-    def evaluate(self, prices: List[float]) -> Optional[str]:
+    def evaluate(self, prices: List[float]) -> Tuple[Optional[str], float]:
         if len(prices) < self.lookback:
-            return None
+            return None, 0.0
 
         recent = prices[-self.lookback:]
         average = sum(recent) / len(recent)
         current = recent[-1]
 
         if average == 0:
-            return None
+            return None, 0.0
 
         momentum = (current - average) / average
+        strength = abs(momentum)
 
         if momentum > self.threshold:
-            return "CALL"
+            return "CALL", strength
         if momentum < -self.threshold:
-            return "PUT"
-        return None
+            return "PUT", strength
+        return None, strength
 
 
 class DerivOptionsBot:
@@ -37,6 +42,55 @@ class DerivOptionsBot:
             threshold=config.threshold,
         )
         self.prices: Deque[float] = deque(maxlen=max(config.lookback, 10))
+        self.trade_logger = TradeLogger(config.trade_log_path)
+        self.trade_count_today = 0
+        self.daily_loss = 0.0
+        self.last_trade_time = 0.0
+        self.daily_reset_time = datetime.now().date()
+
+    def _should_reset_daily_stats(self) -> None:
+        today = datetime.now().date()
+        if today != self.daily_reset_time:
+            self.daily_reset_time = today
+            self.trade_count_today = 0
+            self.daily_loss = 0.0
+
+    def _risk_ok(self, signal_strength: float, amount: float) -> bool:
+        self._should_reset_daily_stats()
+
+        if amount > self.config.max_trade_amount:
+            print(
+                f"Trade blocked: amount {amount} exceeds max_trade_amount "
+                f"{self.config.max_trade_amount}."
+            )
+            return False
+
+        if self.trade_count_today >= self.config.max_trades_per_day:
+            print(
+                f"Trade blocked: reached max_trades_per_day "
+                f"({self.config.max_trades_per_day})."
+            )
+            return False
+
+        if self.config.max_daily_loss > 0 and self.daily_loss >= self.config.max_daily_loss:
+            print(
+                f"Trade blocked: daily_loss {self.daily_loss} reached max_daily_loss "
+                f"{self.config.max_daily_loss}."
+            )
+            return False
+
+        if signal_strength < 0.01:
+            print("Trade blocked: signal strength too weak.")
+            return False
+
+        now = time.time()
+        if now - self.last_trade_time < self.config.cooldown_seconds:
+            print(
+                f"Trade blocked: cooldown active for {self.config.cooldown_seconds} seconds."
+            )
+            return False
+
+        return True
 
     async def run(self):
         print(f"Connecting to Deriv: {self.config.deriv_api_url}")
@@ -62,22 +116,52 @@ class DerivOptionsBot:
 
                 tick_value = float(price)
                 self.prices.append(tick_value)
-                signal = self.strategy.evaluate(list(self.prices))
+                signal, strength = self.strategy.evaluate(list(self.prices))
 
                 if signal is not None:
-                    print(
-                        f"Signal detected: {signal} @ price={tick_value:.4f} | "
-                        f"lookback={len(self.prices)}"
-                    )
-                    trade_result = await self.client.buy_contract(
-                        contract_type=signal,
-                        symbol=self.config.symbol,
-                        amount=self.config.amount,
-                        duration=self.config.duration,
-                        duration_unit=self.config.duration_unit,
-                    )
-                    print(f"Trade payload: {trade_result}")
-                    await asyncio.sleep(self.config.trade_pause_seconds)
+                    trade_amount = min(self.config.amount, self.config.max_trade_amount)
+                    if self._risk_ok(strength, trade_amount):
+                        print(
+                            f"Signal detected: {signal} @ price={tick_value:.4f} | "
+                            f"strength={strength:.4f} | lookback={len(self.prices)}"
+                        )
+                        trade_result = await self.client.buy_contract(
+                            contract_type=signal,
+                            symbol=self.config.symbol,
+                            amount=trade_amount,
+                            duration=self.config.duration,
+                            duration_unit=self.config.duration_unit,
+                        )
+                        self.last_trade_time = time.time()
+                        self.trade_count_today += 1
+                        self.trade_logger.log_trade(
+                            signal=signal,
+                            symbol=self.config.symbol,
+                            price=tick_value,
+                            amount=trade_amount,
+                            duration=self.config.duration,
+                            duration_unit=self.config.duration_unit,
+                            status="submitted",
+                            notes=f"signal_strength={strength:.4f}",
+                        )
+                        print(f"Trade payload: {trade_result}")
+                        print(
+                            f"Risk state: trades_today={self.trade_count_today}, "
+                            f"daily_loss={self.daily_loss}, "
+                            f"cooldown={self.config.cooldown_seconds}s"
+                        )
+                        await asyncio.sleep(self.config.trade_pause_seconds)
+                    else:
+                        self.trade_logger.log_trade(
+                            signal=signal,
+                            symbol=self.config.symbol,
+                            price=tick_value,
+                            amount=trade_amount,
+                            duration=self.config.duration,
+                            duration_unit=self.config.duration_unit,
+                            status="blocked",
+                            notes=f"signal_strength={strength:.4f}",
+                        )
 
                 await asyncio.sleep(0.5)
         finally:

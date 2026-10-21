@@ -8,6 +8,7 @@ It is designed as a starting point for experimenting with:
 - Live tick subscription
 - Momentum-based option signal generation
 - Automatic trade execution for `CALL` or `PUT` contracts
+- Risk controls and trade logging
 
 Important:
 
@@ -37,7 +38,7 @@ Important:
    cp .env.example .env
    ```
 
-4. Fill in your Deriv credentials:
+4. Fill in your Deriv credentials and risk settings:
 
    ```env
    DERIV_TOKEN=your_deriv_api_token
@@ -47,6 +48,11 @@ Important:
    DERIV_DURATION_UNIT=m
    DERIV_LOOKBACK=20
    DERIV_THRESHOLD=0.8
+   DERIV_MAX_TRADE_AMOUNT=1
+   DERIV_MAX_DAILY_LOSS=50
+   DERIV_MAX_TRADES_PER_DAY=10
+   DERIV_COOLDOWN_SECONDS=30
+   DERIV_TRADE_LOG_PATH=trades.csv
    ```
 
 5. Run the bot:
@@ -59,22 +65,18 @@ Important:
 
 - `main.py` — entry point
 - `deriv_bot/config.py` — environment configuration and validation
-- `deriv_bot/deriv_api.py` — websocket client and simple momentum strategy
-- `deriv_bot/bot.py` — bot runner
+- `deriv_bot/logger.py` — CSV trade logging utility
+- `deriv_bot/deriv_api.py` — websocket client
+- `deriv_bot/bot.py` — trading strategy, risk management, and bot loop
 
-## Notes
+## Risk controls included
 
-The included strategy is intentionally small and easy to modify. You can replace the momentum logic with:
+The starter bot now includes:
 
-- RSI-based entries
-- price action breakouts
-- volatility filtering
-- multiple-symbol scheduling
+- `max_trade_amount` limit
+- `max_daily_loss` limit
+- `max_trades_per_day` cap
+- `cooldown_seconds` between trades
+- `trade_log_path` CSV logging
 
-If you want, I can next turn this into a more production-ready bot with:
-
-- signal logging to CSV / SQLite
-- risk management and stop-loss controls
-- custom command-line options
-- backtesting support
-- Telegram or email alerts
+These are basic local controls and are not a substitute for proper account risk management.
