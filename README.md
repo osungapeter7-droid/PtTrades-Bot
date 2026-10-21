@@ -9,6 +9,7 @@ It is designed as a starting point for experimenting with:
 - Momentum-based option signal generation
 - Automatic trade execution for `CALL` or `PUT` contracts
 - Risk controls and trade logging
+- Dry-run mode for safe strategy testing
 
 Important:
 
@@ -48,6 +49,7 @@ Important:
    DERIV_DURATION_UNIT=m
    DERIV_LOOKBACK=20
    DERIV_THRESHOLD=0.8
+   DERIV_DRY_RUN=true
    DERIV_MAX_TRADE_AMOUNT=1
    DERIV_MAX_DAILY_LOSS=50
    DERIV_MAX_TRADES_PER_DAY=10
@@ -60,6 +62,22 @@ Important:
    ```bash
    python main.py
    ```
+
+## Dry-run mode
+
+Set `DERIV_DRY_RUN=true` to test the bot without placing real orders.
+It will still:
+
+- connect to the Deriv websocket
+- receive live ticks
+- evaluate the strategy
+- log each signal and its simulated action
+
+To place real trades, set:
+
+```env
+DERIV_DRY_RUN=false
+```
 
 ## Project structure
 
@@ -78,5 +96,6 @@ The starter bot now includes:
 - `max_trades_per_day` cap
 - `cooldown_seconds` between trades
 - `trade_log_path` CSV logging
+- `dry_run` mode for safe testing
 
 These are basic local controls and are not a substitute for proper account risk management.

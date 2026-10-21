@@ -6,6 +6,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}
+
+
 @dataclass
 class BotConfig:
     deriv_api_url: str = field(
@@ -26,6 +33,7 @@ class BotConfig:
     max_trades_per_day: int = field(default_factory=lambda: int(os.getenv("DERIV_MAX_TRADES_PER_DAY", "10")))
     cooldown_seconds: int = field(default_factory=lambda: int(os.getenv("DERIV_COOLDOWN_SECONDS", "30")))
     trade_log_path: str = field(default_factory=lambda: os.getenv("DERIV_TRADE_LOG_PATH", "trades.csv"))
+    dry_run: bool = field(default_factory=lambda: _env_bool("DERIV_DRY_RUN", True))
 
 
 def load_config() -> BotConfig:

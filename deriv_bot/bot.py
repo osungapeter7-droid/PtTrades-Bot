@@ -94,6 +94,9 @@ class DerivOptionsBot:
 
     async def run(self):
         print(f"Connecting to Deriv: {self.config.deriv_api_url}")
+        if self.config.dry_run:
+            print("DRY RUN MODE: no actual trades will be placed.")
+
         await self.client.connect()
         await self.client.subscribe_ticks(self.config.symbol)
         print(f"Listening for ticks on {self.config.symbol}")
@@ -125,31 +128,56 @@ class DerivOptionsBot:
                             f"Signal detected: {signal} @ price={tick_value:.4f} | "
                             f"strength={strength:.4f} | lookback={len(self.prices)}"
                         )
-                        trade_result = await self.client.buy_contract(
-                            contract_type=signal,
-                            symbol=self.config.symbol,
-                            amount=trade_amount,
-                            duration=self.config.duration,
-                            duration_unit=self.config.duration_unit,
-                        )
-                        self.last_trade_time = time.time()
-                        self.trade_count_today += 1
-                        self.trade_logger.log_trade(
-                            signal=signal,
-                            symbol=self.config.symbol,
-                            price=tick_value,
-                            amount=trade_amount,
-                            duration=self.config.duration,
-                            duration_unit=self.config.duration_unit,
-                            status="submitted",
-                            notes=f"signal_strength={strength:.4f}",
-                        )
-                        print(f"Trade payload: {trade_result}")
-                        print(
-                            f"Risk state: trades_today={self.trade_count_today}, "
-                            f"daily_loss={self.daily_loss}, "
-                            f"cooldown={self.config.cooldown_seconds}s"
-                        )
+
+                        if self.config.dry_run:
+                            self.last_trade_time = time.time()
+                            self.trade_count_today += 1
+                            self.trade_logger.log_trade(
+                                signal=signal,
+                                symbol=self.config.symbol,
+                                price=tick_value,
+                                amount=trade_amount,
+                                duration=self.config.duration,
+                                duration_unit=self.config.duration_unit,
+                                status="dry-run",
+                                notes=f"signal_strength={strength:.4f}",
+                            )
+                            print(
+                                f"DRY RUN: would buy {signal} contract for {self.config.symbol} "
+                                f"amount={trade_amount}, duration={self.config.duration}{self.config.duration_unit}"
+                            )
+                            print(
+                                f"Risk state: trades_today={self.trade_count_today}, "
+                                f"daily_loss={self.daily_loss}, "
+                                f"cooldown={self.config.cooldown_seconds}s"
+                            )
+                        else:
+                            trade_result = await self.client.buy_contract(
+                                contract_type=signal,
+                                symbol=self.config.symbol,
+                                amount=trade_amount,
+                                duration=self.config.duration,
+                                duration_unit=self.config.duration_unit,
+                            )
+                            self.last_trade_time = time.time()
+                            self.trade_count_today += 1
+                            self.trade_logger.log_trade(
+                                signal=signal,
+                                symbol=self.config.symbol,
+                                price=tick_value,
+                                amount=trade_amount,
+                                duration=self.config.duration,
+                                duration_unit=self.config.duration_unit,
+                                status="submitted",
+                                notes=f"signal_strength={strength:.4f}",
+                            )
+                            print(f"Trade payload: {trade_result}")
+                            print(
+                                f"Risk state: trades_today={self.trade_count_today}, "
+                                f"daily_loss={self.daily_loss}, "
+                                f"cooldown={self.config.cooldown_seconds}s"
+                            )
+
                         await asyncio.sleep(self.config.trade_pause_seconds)
                     else:
                         self.trade_logger.log_trade(
