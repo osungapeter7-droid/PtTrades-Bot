@@ -10,6 +10,7 @@ It is designed as a starting point for experimenting with:
 - Automatic trade execution for `CALL` or `PUT` contracts
 - Risk controls and trade logging
 - Dry-run mode for safe strategy testing
+- Trade summary command for reviewing recent activity
 
 Important:
 
@@ -63,6 +64,20 @@ Important:
    python main.py
    ```
 
+## Review recent activity
+
+You can inspect the trade log without running the bot:
+
+```bash
+python main.py --summary
+```
+
+This prints:
+
+- total entries in the CSV log
+- counts by signal and status
+- the most recent trades
+
 ## Dry-run mode
 
 Set `DERIV_DRY_RUN=true` to test the bot without placing real orders.
@@ -81,9 +96,10 @@ DERIV_DRY_RUN=false
 
 ## Project structure
 
-- `main.py` — entry point
+- `main.py` — entry point and CLI
 - `deriv_bot/config.py` — environment configuration and validation
 - `deriv_bot/logger.py` — CSV trade logging utility
+- `deriv_bot/trade_summary.py` — summary/report utility for trade history
 - `deriv_bot/deriv_api.py` — websocket client
 - `deriv_bot/bot.py` — trading strategy, risk management, and bot loop
 
@@ -97,5 +113,6 @@ The starter bot now includes:
 - `cooldown_seconds` between trades
 - `trade_log_path` CSV logging
 - `dry_run` mode for safe testing
+- `--summary` CLI to review the log
 
 These are basic local controls and are not a substitute for proper account risk management.
